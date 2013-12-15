@@ -8,7 +8,7 @@ name_re = re.compile('\s*(\S+)\s*=')
 text_re = re.compile('''\A.*?[()#"']''', re.DOTALL)
 
 class TNSConfig(list):
-  def formatted(self,spcs=2,lvl=1):
+  def formatted(self,spcs=2,lvl=0):
     ret=''
     for piece in self:
       if type(piece) == str:
@@ -21,14 +21,15 @@ class TNSConfig(list):
           if len(ret) > 0 and ret[-1] != '\n':
             ret+='\n'
           ret+=lvl*spcs*' '+piece
+        elif piece[0] == '#':
+          ret+=piece+'\n'
         else:
-          if len(ret) > 0:
-            if lvl==1:
-              ret+='\n\n'
-            elif ret[-1] == ')':
-              ret+='\n'
-          ret+=piece
+          if lvl<=1:
+            ret+='\n'
+          ret+=str(lvl)+'_'+piece
       else:
+        if len(ret) > 0 and ret[-1] == ')':
+          ret+='\n'
         ret+=piece.formatted(spcs,lvl+1)
     return ret
   def __str__(self):
@@ -67,10 +68,19 @@ class TNSConfig(list):
         content=content[len(piece):]
         data.append(piece)
       elif content[0] == '(':
-        data.append(content[0])
+        element=TNSConfig('')
+        try:
+          m = name_re.search(data[-1])
+          name=m.group(1)
+          element.append(data[-1])
+          data[-1]=element
+        except:
+          name=None
+          data.append(element)
+        element.append(content[0])
         content=content[1:]
         piece,content = self.get_element(content)
-        data.append(piece)
+        element.append(piece)
       elif content[0] == ')':
         data.append(content[0])
         content = content[1:]
@@ -85,17 +95,15 @@ class TNSConfig(list):
     return data, content
   def name(self):
     try:
-      m=name_re(self)
+      m=name_re.search(self[0])
       return m.group(1)
     except:
       pass
   def sub_names(self):
     ret = []
     for sub in self:
-#      print sub
       try:
-        m=name_re.search(sub)
-        ret.append(m.group(1))
+        ret.append(sub.name())
       except:
         pass
     return ret
@@ -143,11 +151,11 @@ if __name__ == "__main__":
 
   tnsfile=TNSConfig(source.read())
 #  dest.write(tnsfile.formatted()+'\n')
-  dest.write(tnsfile.__repr__())
+#  dest.write(tnsfile.__repr__()+'\n')
 #  dest.write(str(tnsfile.sub_names())+'\n')
-  for sub in tnsfile:
-    print sub
-    try:
-      stderr.write(sub.name()+'\n')
-    except:
-      pass
+#  for sub in tnsfile:
+#    try:
+#      stderr.write(sub.name()+'\n')
+#    except:
+#      pass
+
