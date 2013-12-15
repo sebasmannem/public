@@ -1,0 +1,6 @@
+#!/bin/sh
+if [ `mount | grep -c /u01/backup` -eq 0 ]; then
+  mkdir -p /u01/backup
+  /sbin/cryptsetup luksOpen /dev/lvmvolume/backup backup < /u02/Werkmap/Bas/backup.key
+  /bin/mount /dev/mapper/backup
+fi

@@ -1,0 +1,31 @@
+#!/bin/sh
+isRunning=`ps -ef | grep -e '/bin/sh.*cron_rsync' | grep -v grep | grep -cv /bin/sh`
+if [ "$isRunning" -gt 0 ]; then
+        echo "Isrunning: $isRunning"
+        echo `ps -ef | grep -e '/bin/sh.*cron_rsync' | grep -v grep | grep -v /bin/sh`
+        return
+fi
+
+log="/var/log/`basename $0`.log"
+[ -f $log ] && rm $log
+
+/u02/scripts/mount_u01_backup
+
+if [ `mount | grep -c /u01/backup` -ne 0 ]; then
+  mkdir -p /u01/backup/lhome/
+  mkdir -p /u01/backup/www/
+  mkdir -p /u01/backup/rhome/
+  mkdir -p /u01/backup/Werkmap/
+  mkdir -p /u01/backup/Media/Plaatjes/
+  mkdir -p /u01/backup/Media/Foto/
+fi
+
+rsync -av --delete --exclude-from='/root/.rsync_exclude' /home/ /u01/backup/lhome/ | tee $log 2>&1
+rsync -av --delete --bwlimit=1000 /u02/www/ /u01/backup/www/ | tee -a $log 2>&1
+[ -d /u01/backup/rhome/ ] && rsync -av --delete /u02/rhome/ /u01/backup/rhome/ | tee -a $log 2>&1
+rsync -av --safe-links --remove-source-files /home/sebas/Video\'s/ /u02/Media/Videos/ | tee -a $log 2>&1
+rsync -av /u01/iso/ /u02/stage/iso/ | tee -a $log 2>&1
+[ -d /u01/backup/Werkmap/ ] && rsync -av --delete /u02/Werkmap/ /u01/backup/Werkmap/ | tee -a $log 2>&1
+[ -d /u01/backup/Media/Plaatjes/ ] && rsync -av --delete /u02/Media/Plaatjes/ /u01/backup/Media/Plaatjes/ | tee -a $log 2>&1
+[ -d /u01/backup/Media/Foto/ ] && rsync -av --delete /u02/Media/Foto/ /u01/backup/Media/Foto/ | tee -a $log 2>&1
+rsync -av /u02/public/KeePass/Prive.kdb /home/sebas/Bureaublad/KeePass/Prive.kdb
