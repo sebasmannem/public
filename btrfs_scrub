@@ -1,0 +1,7 @@
+#!/bin/sh
+mount | awk '/btrfs/{sub(/^.*\//,"",$1);print $1}' | sort -u | while read d
+do
+  mp=$(mount | awk "\$1~/$d/{print \$3}"|head -n1)
+  echo "$mp op $d"
+  btrfs scrub start -B $mp
+done

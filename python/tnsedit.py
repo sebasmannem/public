@@ -26,7 +26,7 @@ class TNSConfig(list):
         else:
           if lvl<=1:
             ret+='\n'
-          ret+=str(lvl)+'_'+piece
+          ret+=piece
       else:
         if len(ret) > 0 and ret[-1] == ')':
           ret+='\n'
@@ -107,6 +107,14 @@ class TNSConfig(list):
       except:
         pass
     return ret
+  def del_element(self,name):
+    for i in range(len(self)):
+      try:
+        if self[i].name() == name:
+           self.pop(i)
+      except:
+        pass
+
 
 if __name__ == "__main__":
   def read_args():
@@ -150,7 +158,8 @@ if __name__ == "__main__":
   read_args()
 
   tnsfile=TNSConfig(source.read())
-#  dest.write(tnsfile.formatted()+'\n')
+  tnsfile.sort()
+  dest.write(tnsfile.formatted()+'\n')
 #  dest.write(tnsfile.__repr__()+'\n')
 #  dest.write(str(tnsfile.sub_names())+'\n')
 #  for sub in tnsfile:
