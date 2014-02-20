@@ -2,6 +2,8 @@
 #psql -h localhost -p 9876
 import SocketServer
 import struct
+import threading
+import time
 
 def char_to_hex(char):
     retval = hex(ord(char))
@@ -14,19 +16,23 @@ def char_to_hex(char):
 def str_to_hex(inputstr):
     return " ".join(char_to_hex(char) for char in inputstr)
 
-class Handler(SocketServer.BaseRequestHandler):
+class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
     def handle(self):
         print "handle()"
         self.read_SSLRequest()
         self.send_to_socket("N")
 
         self.read_StartupMessage()
-        self.send_AuthenticationClearText()
-        self.read_PasswordMessage()
+#        self.send_AuthenticationClearText()
+#        self.read_PasswordMessage()
         self.send_AuthenticationOK()
+        self.send_ParameterStatus('server_version','9.3.4')
         self.send_ReadyForQuery()
-        self.read_Query()
-        self.send_queryresult()
+        Continue, Query = self.read_Query()
+        while Continue:
+          self.send_queryresult()
+          Continue, Query = self.read_Query()
+        raise(SystemExit)
 
     def send_queryresult(self):
         fieldnames = ['abc', 'def']
@@ -74,9 +80,19 @@ class Handler(SocketServer.BaseRequestHandler):
     def read_Query(self):
         data = self.read_socket()
         msgident, msglen = struct.unpack("!ci", data[0:5])
-        assert msgident == "Q"
-        print data[5:]
+        if msgident == "Q":
+          print "Query: "+data[5:]
+          return True, data[5:]
+        elif msgident == "X":
+          print "Terminate"
+          return False, ''
+        else:
+          print "Unexpected command."
+          return False, ''
 
+    def send_ParameterStatus(self, Name, Value):
+        frmt="!ci{0}s{1}s".format(len(Name)+1,len(Value)+1)
+        self.send_to_socket(struct.pack(frmt, 'S', len(Name+Value)+6, Name, Value))
 
     def send_ReadyForQuery(self):
         self.send_to_socket(struct.pack("!cic", 'Z', 5, 'I'))
@@ -108,9 +124,26 @@ class Handler(SocketServer.BaseRequestHandler):
     def send_AuthenticationClearText(self):
         self.send_to_socket(struct.pack("!cii", 'R', 8, 3))
 
+class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+    pass
+
 if __name__ == "__main__":
-    server = SocketServer.TCPServer(("localhost", 9876), Handler)
+    SocketServer.ThreadingMixIn.daemon_threads = True
+    HOST, PORT = "localhost", 9876
+    #server = SocketServer.TCPServer((HOST, PORT), ThreadedTCPRequestHandler) #Single threaded...
+    server = ThreadedTCPServer((HOST, PORT), ThreadedTCPRequestHandler)
+    # Start a thread with the server -- that thread will then start one
+    # more thread for each request
+    server_thread = threading.Thread(target=server.serve_forever)
+    # Exit the server thread when the main thread terminates
+    server_thread.daemon = True
+    server_thread.start()
+
     try:
-        server.serve_forever()
+        #Wait until main thread has stopped, or an exception occurs...
+        while True:
+            time.sleep(10)
+        #server.serve_forever() #Single threaded
     except:
-        server.shutdown()
+        pass
+        #server.shutdown()
