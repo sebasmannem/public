@@ -1,2 +1,27 @@
 #!/bin/sh
-pacman -S archlinux-themes-kdm autofs btrfs-progs dmidecode dnsmasq dnsutils ebtables findutils firefox flashplugin fprint gdb gdisk git guake kde-l10n-nl kde-meta kdebase-workspace kdeplasma-applets-plasma-nm keepassx libnotify libreoffice libvirt mlocate net-tools networkmanager networkmanager-openvpn nfs-utils openssh openvpn pam pm-utils python python2-setuptools python2-udev qemu rsync sudo synaptics truecrypt unzip vim virt-manager vlc wget xf86-input-synaptics xf86-video-fbdev xf86-video-intel xf86-video-modesetting xf86-video-vesa xorg-apps xorg-server xorg-xclock xorg-xinit zip
+
+#Refresh list with:
+#{ pacman -Qqet | awk '{print $1}' ; cat /u02/nas/scripts/conf/package_list.txt ; } | sort -u > package_list.txt
+
+PCKs=$(cat /u02/nas/scripts/conf/package_list.txt)
+echo Trying to install
+echo $PCKs
+echo
+pacman -S --noconfirm ${PCKs} 2>&1 | awk 'BEGIN{FS=":"}$1~/error/{print $3}' > /tmp/pacman_failed_packages.txt
+PCKs_FAILED=$(cat /tmp/pacman_failed_packages.txt | xargs | sed 's/ /|/g')
+if [ "$PCKs_FAILED" ]; then
+  echo Failed on
+  echo $PCKs_FAILED
+  echo
+  PCKs=$(grep -vE "($PCKs_FAILED)" /u02/nas/scripts/conf/package_list.txt)
+  echo Trying to install
+  echo $PCKs
+  echo
+  pacman -S --noconfirm ${PCKs} 
+fi
+
+exit
+cat /u02/nas/scripts/conf/package_list.txt | while read pck
+do
+  pacman -S --noconfirm "$pck" || echo "$pck" >> /tmp/pacman_failed_packages.txt
+done

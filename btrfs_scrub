@@ -1,7 +1,30 @@
 #!/bin/sh
+DIR=/var/lib/btrfs
+PIDFILE=$DIR/scrub_pid
+LOGFILE=$DIR/scrub.log
+NOW=$(date +%s)
+[ -f $LOGFILE ] && LASTRUN=$(stat -c %Y "$LOGFILE") || LASTRUN=0
+#if [ $(($NOW-$LASTRUN)) -lt 604800 ]; then
+#  echo "Logfile $LOGFILE was modified in the last 604800 minutes (1 week)."
+#  echo "I only want to be run once a week. I will not do anything..."
+#  exit 1
+#fi
+if [ -f "$PIDFILE" ]; then
+  PIDs=$(cat "$PIDFILE" | xargs | sed 's/ /|/g')
+  [ "$PIDs" ] && ALIVE=$(ps -ef | awk '$2~/('$PIDs')/{print $2}' | xargs | sed 's/ /, /g')
+  if [ "$ALIVE" ]; then
+    echo "PID's in $PIDFILE ($ALIVE) are still running."
+    echo "Probably, because scrub is allready running and has not yet finished."
+    echo "I will not do anything..."
+    exit 1
+  fi
+fi
+echo $$ >> "$PIDFILE"
+[ -f "$LOGFILE" ] && rm "$LOGFILE"
 mount | awk '/btrfs/{sub(/^.*\//,"",$1);print $1}' | sort -u | while read d
 do
   mp=$(mount | awk "\$1~/$d/{print \$3}"|head -n1)
-  echo "$mp op $d"
-  btrfs scrub start -B $mp
+  echo "Scrubbing $d mounted on $mp." | tee -a "$LOGFILE"
+  btrfs scrub start -B $mp >> "$LOGFILE"
 done
+sed -i "/^$$$/d" $PIDFILE
