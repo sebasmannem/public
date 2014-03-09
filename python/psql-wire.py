@@ -26,7 +26,7 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
 #        self.send_AuthenticationClearText()
 #        self.read_PasswordMessage()
         self.send_AuthenticationOK()
-        self.send_ParameterStatus('server_version','9.3.4')
+        self.send_ParameterStatus('server_version','9.4')
         self.send_ReadyForQuery()
         Continue, Query = self.read_Query()
         while Continue:
@@ -35,17 +35,21 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
         raise(SystemExit)
 
     def send_queryresult(self):
-        fieldnames = ['abc', 'def']
+        fieldnames = ['Hi', 'Polla']
         HEADERFORMAT = "!cih"
         fields = ''.join(self.fieldname_msg(name) for name in fieldnames)
         rdheader = struct.pack(HEADERFORMAT, 'T', struct.calcsize(HEADERFORMAT) - 1 + len(fields), len(fieldnames))
         self.send_to_socket(rdheader + fields)
 
-        rows = [[1, 2], [3, 4]]
+        rows = [['You', 'are'], ['an', 'idjit...']]
         DRHEADER = "!cih"
         for row in rows:
-            dr_data = struct.pack("!ii", -1, -1)
-            dr_header = struct.pack(DRHEADER, 'D', struct.calcsize(DRHEADER) - 1 + len(dr_data), 2)
+            dr_data=''
+            for c in row:
+                c = str(c)
+                frmt='!i{0}s'.format(len(c))
+                dr_data += struct.pack(frmt, len(c), c)
+            dr_header = struct.pack(DRHEADER, 'D', struct.calcsize(DRHEADER) - 1 + len(dr_data), len(row))
             self.send_to_socket(dr_header + dr_data)
 
         self.send_CommandComplete()
