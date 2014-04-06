@@ -24,11 +24,11 @@ def main(argv):
   sys.exit(2)
 
 def usage(scriptname):
- print "'"+scriptname+"' can be used with the following options:"
- print "-h, --help                     : Show this usage info."
- print "-s [source], --source=[source] : The source file that will be read."
- print "-d [dest], --dest=[dest]       : The destination file to wich will be written.\n"
- print "Source is mandatory.\nWithout a destination, output will be written to stdout."
+ print """'{0}' can be used with the following options:
+-h, --help                     : Show this usage info.
+-s [source], --source=[source] : The source file that will be read.
+-d [dest], --dest=[dest]       : The destination file to wich will be written.
+Source is mandatory.\nWithout a destination, output will be written to stdout.""".format(scriptname)
 
 import sys, getopt, string
 from datetime import datetime, date, time
