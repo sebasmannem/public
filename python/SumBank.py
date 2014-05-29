@@ -35,6 +35,8 @@ You can pipe (cat *.csv | %prog) the downloaded csv's into %prog and he will sho
 
   if options.filter != '':
     myFilter = options.filter.split(',')
+  else:
+    myFilter = None
 
   rekeningen = {}
   dagen = {}
@@ -96,16 +98,21 @@ You can pipe (cat *.csv | %prog) the downloaded csv's into %prog and he will sho
       else:
         maanden[mnd] = pm
 
-  print "-"*90
-  print "| {0:^21s} | {1:^50s} | {2:^9s} |".format('Account','Descr.', 'Total')
-  print "-"*90
+  keysize=max(len(rek) for rek in rekeningen.keys())
+  omssize=max(len(rekeningen[rek][1]) for rek in rekeningen)
+  numsize=9
+  linesize=keysize+omssize+numsize+10
+
+  print "-"*linesize
+  print "| {3:^{0}s} | {4:^{1}s} | {5:^{2}s} |".format(keysize,omssize,numsize,'Account','Descr.', 'Total')
+  print "-"*linesize
   for key in sorted(rekeningen,key= lambda rek: rekeningen[rek]):
     bedrag,oms = rekeningen[key]
     if key == '':
       key = 'Pinnen'
       oms = ''
-    print "| {0:>21s} | {1:<50s} | {2:>9.2f} |".format(key,oms,bedrag)
-  print "-"*90
+    print "| {3:>{0}s} | {4:<{1}s} | {5:>{2}.2f} |".format(keysize,omssize,numsize,key,oms,bedrag)
+  print "-"*linesize
 
 
   print "-"*47
