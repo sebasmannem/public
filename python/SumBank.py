@@ -115,10 +115,10 @@ You can pipe (cat *.csv | %prog) the downloaded csv's into %prog and he will sho
   print "-"*linesize
 
 
-  print "-"*47
-  print "| {0:^10s} | {1:^8s} | {2:^8s} | {3:^8s} |".format('Month','earned','paid','Nett')
-  print "-"*47
+  print "-"*43
+  print "| {0:^6s} | {1:^8s} | {2:^8s} | {3:^8s} |".format('Month','earned','paid','Nett')
+  print "-"*43
   for key in sorted(maanden.keys()):
     bij,af = maanden[key]
-    print "| {0:<10s} | {1:>8.2f} | {2:>8.2f} | {3:>8.2f} |".format(key,bij,af,bij-af)
-  print "-"*47
+    print "| {0:<6s} | {1:>8.2f} | {2:>8.2f} | {3:>8.2f} |".format(key,bij,af,bij-af)
+  print "-"*43
