@@ -101,10 +101,11 @@ You can pipe (cat *.csv | %prog) the downloaded csv's into %prog and he will sho
   keysize=max(len(rek) for rek in rekeningen.keys())
   omssize=max(len(rekeningen[rek][1]) for rek in rekeningen)
   numsize=9
-  linesize=keysize+omssize+numsize+10
+  hdr="| {3:^{0}s} | {4:^{1}s} | {5:^{2}s} |".format(keysize,omssize,numsize,'Account','Descr.', 'Total')
+  linesize=len(hdr)
 
   print "-"*linesize
-  print "| {3:^{0}s} | {4:^{1}s} | {5:^{2}s} |".format(keysize,omssize,numsize,'Account','Descr.', 'Total')
+  print hdr
   print "-"*linesize
   for key in sorted(rekeningen,key= lambda rek: rekeningen[rek]):
     bedrag,oms = rekeningen[key]
