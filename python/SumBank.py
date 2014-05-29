@@ -80,6 +80,7 @@ You can pipe (cat *.csv | %prog) the downloaded csv's into %prog and he will sho
           continue
       bedrag=float(flds[6].replace(',','.'))
       mnd=dt[0:6]
+      dg=dt[6:8]
       if flds[5] == 'Af':
         pm=(0,bedrag)
         bedrag=0-bedrag
@@ -89,10 +90,10 @@ You can pipe (cat *.csv | %prog) the downloaded csv's into %prog and he will sho
         rekeningen[rek] = (rekeningen[rek][0] + bedrag, rekeningen[rek][1])
       else:
         rekeningen[rek] = (bedrag, oms)
-      if dagen.has_key(dt):
-        dagen[dt] = (pm[0]+dagen[dt][0],pm[1]+dagen[dt][1])
+      if dagen.has_key(dg):
+        dagen[dg] = (pm[0]+dagen[dg][0],pm[1]+dagen[dg][1])
       else:
-        dagen[dt] = pm
+        dagen[dg] = pm
       if maanden.has_key(mnd):
         maanden[mnd] = (pm[0]+maanden[mnd][0],pm[1]+maanden[mnd][1])
       else:
@@ -116,10 +117,24 @@ You can pipe (cat *.csv | %prog) the downloaded csv's into %prog and he will sho
   print "-"*linesize
 
 
-  print "-"*43
-  print "| {0:^6s} | {1:^8s} | {2:^8s} | {3:^8s} |".format('Month','earned','paid','Nett')
-  print "-"*43
+  hdr="| {0:^6s} | {1:^8s} | {2:^8s} | {3:^8s} |".format('Month','earned','paid','Nett')
+  print "-"*len(hdr)
+  print hdr
+  print "-"*len(hdr)
   for key in sorted(maanden.keys()):
     bij,af = maanden[key]
     print "| {0:<6s} | {1:>8.2f} | {2:>8.2f} | {3:>8.2f} |".format(key,bij,af,bij-af)
-  print "-"*43
+  print "-"*len(hdr)
+
+  mndnum=len(maanden)
+  saldo=0
+  hdr="| {0:^6s} | {1:^10s} | {2:^8s} | {3:^8s} | {4:^9s} |".format('Day','avg earned','avg paid','avg Nett', 'saldo')
+  print "-"*len(hdr)
+  print hdr
+  print "-"*len(hdr)
+  for key in sorted(dagen.keys()):
+    bij,af = dagen[key]
+    saldo+=bij-af
+    print "| {0:<6s} | {1:>10.2f} | {2:>8.2f} | {3:>8.2f} | {4:>9.2f} |".format(key,bij/mndnum,af/mndnum,(bij-af)/mndnum,saldo/mndnum)
+  print "-"*len(hdr)
+
