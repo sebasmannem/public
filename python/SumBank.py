@@ -127,14 +127,23 @@ You can pipe (cat *.csv | %prog) the downloaded csv's into %prog and he will sho
   print "-"*len(hdr)
 
   mndnum=len(maanden)
+  dagnum=len(dagen)
+
+  dagtot=[(dagen[key][0]-dagen[key][1])/mndnum for key in sorted(dagen.keys())]
+  saldos=[sum(dagtot[0:i+1]) for i in range(dagnum) ]
+  avg_saldo=sum(saldos)/dagnum
+#  min_saldo=min(saldos)
+
   saldo=0
+
   hdr="| {0:^6s} | {1:^10s} | {2:^8s} | {3:^8s} | {4:^9s} |".format('Day','avg earned','avg paid','avg Nett', 'saldo')
   print "-"*len(hdr)
   print hdr
   print "-"*len(hdr)
   for key in sorted(dagen.keys()):
     bij,af = dagen[key]
-    saldo+=bij-af
-    print "| {0:<6s} | {1:>10.2f} | {2:>8.2f} | {3:>8.2f} | {4:>9.2f} |".format(key,bij/mndnum,af/mndnum,(bij-af)/mndnum,saldo/mndnum)
+    bij,af = bij/mndnum,af/mndnum
+    saldo+=(bij-af)
+    print "| {0:<6s} | {1:>10.2f} | {2:>8.2f} | {3:>8.2f} | {4:>9.2f} |".format(key,bij,af,(bij-af),saldo-avg_saldo)
   print "-"*len(hdr)
 
