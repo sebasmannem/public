@@ -121,9 +121,14 @@ You can pipe (cat *.csv | %prog) the downloaded csv's into %prog and he will sho
   print "-"*len(hdr)
   print hdr
   print "-"*len(hdr)
+  totbij = totaf = 0
   for key in sorted(maanden.keys()):
-    bij,af = maanden[key]
+    bij,af  = maanden[key]
+    totbij += bij
+    totaf  += af
     print "| {0:<6s} | {1:>8.2f} | {2:>8.2f} | {3:>8.2f} |".format(key,bij,af,bij-af)
+  print "-"*len(hdr)
+  print "| {0:<6s} | {1:>8.2f} | {2:>8.2f} | {3:>8.2f} |".format('avg',totbij/len(maanden),totaf/len(maanden),(totbij-totaf)/len(maanden))
   print "-"*len(hdr)
 
   mndnum=len(maanden)
