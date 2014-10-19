@@ -1,7 +1,7 @@
 #!/bin/bash
 
 function QuitOnError() {
-  [ "$1" &&] echo "$1"
+  [ "$1" ] && echo "$1"
   exit 1
 }
 
