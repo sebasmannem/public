@@ -5,11 +5,9 @@ function quitOnError() {
   exit 1
 }
 
-HN=new.mannem.nl
-IP=192.168.122.200
-NETMASK=24
-BROADCASt=192.168.122.255
-GATEWAY=192.168.122.1
+[ $HN ] || HN=new.mannem.nl
+[ $IP ] || IP=192.168.122.200
+[ $BASE ] || BASE=24
 
 [ "$1" ] && DRIVE="$1" || quitOnError "Please specify an empty disk device from /dev/."
 [[ "$DRIVE" =~ / ]] || DRIVE="/dev/$DRIVE"
@@ -46,17 +44,14 @@ pacstrap /mnt base || quitOnError "Could not pacstrap"
 genfstab -p /mnt > /mnt/etc/fstab
 echo '/var/lib/btrfs/empty                            /var/lib/btrfs/__active none    bind' >> /mnt/etc/fstab
 
-echo "$HN" > /mnt/etc/hostname
-
-echo "address=$IP
-netmask=$NETMASK
-broadcast=$BROADCAST
-gateway=$GATEWAY" > /mnt/etc/conf.d/network\@eth0
-cp "/u01/git/scripts/systemd/network@.service" "/mnt/etc/systemd/system/network@.service"
-
 mkdir -p /mnt/u02/nas
 mount -o bind /u02/nas /mnt/u02/nas
 
 ln -sf /usr/share/zoneinfo/Europe/Amsterdam /mnt/etc/localtime
+
+if [ "$HN" -a "$IP" ]; then
+  arch-chroot /u02/nas/git/scripts/python/ConfigNetwork.py --hostname $HN --ip $IP --base $BASE | tee -a /mnt/tmp/install-arch-chroot.log
+  cp "/u01/git/scripts/systemd/network@.service" "/mnt/etc/systemd/system/network@.service"
+fi
 
 arch-chroot /mnt /u02/nas/git/scripts/bash/install-arch-chroot.sh | tee -a /mnt/tmp/install-arch-chroot.log
