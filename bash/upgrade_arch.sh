@@ -12,4 +12,4 @@ umount __active || QuitOnError "Could not umount __active"
 btrfs su sn __active __snapshots/$SS_NAME || QuitOnError "Could not create snapshot"
 mount __active || QuitOnError "Could not mount __active"
 pacman -Syu --noconfirm || QuitOnError "Could not upgrade"
-ls -tr ./__snapshots/ | sed -n '5,$p' | while read s; do btrfs su de ./__snapshots/$s || QuitOnError "Could not remove snapshot $s"; done
+ls -t ./__snapshots/ | sed -n '5,$p' | while read s; do btrfs su de ./__snapshots/$s || QuitOnError "Could not remove snapshot $s"; done

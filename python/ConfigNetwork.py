@@ -58,11 +58,11 @@ class NWConfig():
   def ip(self):
     return self.int_to_ip(self.__ip)
 
-  def __init__(self,ip,netmask,base):
+  def __init__(self,ip,netmask,base=None):
     if "/" in ip:
       ip, base = ip.split("/")
     if netmask:
-      self.__netmask=self.__ip_to_int(netmask)
+      self.__netmask=self.ip_to_int(netmask)
     else:
       self.__netmask = self.base_to_netmask(base)
     self.__ip = self.ip_to_int(ip)
