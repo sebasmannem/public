@@ -43,15 +43,20 @@ for line in subprocess.check_output(cmd).splitlines():
 
     try:
         try:
-            total = "%02.2f" % (float(args[1]) / multiplicator)
-            unshared = "%02.2f" % (float(args[2]) / multiplicator)
-        except ValueError:
+            gid, total, unshared = args[0:3]
+        except:
             continue
-        print("%s\t%s\t%s%s %s%s" % (
+        try:
+            total = "%02.2f" % (float(total) / multiplicator)+sys_args.unit
+            unshared = "%02.2f" % (float(unshared) / multiplicator)+sys_args.unit
+        except ValueError as e:
+            pass
+        if '/' in gid:
+          print("%s\t%s\t%s %s" % (
             subvolume_name.ljust(40),
-            args[0],
-            total.rjust(10), sys_args.unit,
-            unshared.rjust(10), sys_args.unit,
+            gid,
+            total.rjust(10), 
+            unshared.rjust(10), 
         ))
     except IndexError:
         pass
