@@ -1,5 +1,40 @@
 #!/usr/bin/env python3
 
+def bytes2human(n, format="%(value)i%(symbol)s"):
+    """
+    >>> bytes2human(10000)
+    '9K'
+    >>> bytes2human(100001221)
+    '95M'
+    """
+    symbols = ('B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
+    prefix = {}
+    for i, s in enumerate(symbols[1:]):
+        prefix[s] = 1 << (i+1)*10
+    for symbol in reversed(symbols[1:]):
+        if n >= prefix[symbol]:
+            value = float(n) / prefix[symbol]
+            return format % locals()
+    return format % dict(symbol=symbols[0], value=n)
+
+def human2bytes(s):
+    """
+    >>> human2bytes('1M')
+    1048576
+    >>> human2bytes('1G')
+    1073741824
+    """
+    symbols = ('B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
+    letter = s[-1:].strip().upper()
+    num = s[:-1]
+    assert num.isdigit() and letter in symbols
+    num = float(num)
+    prefix = {symbols[0]:1}
+    for i, s in enumerate(symbols[1:]):
+        prefix[s] = 1 << (i+1)*10
+    return int(num * prefix[letter])
+
+
 import argparse
 import subprocess
 
@@ -19,8 +54,6 @@ parser.add_argument(
 sys_args = parser.parse_args()
 mount_point = sys_args.mount_point
 
-multiplicator_lookup = ['B', 'K', 'M', 'G', 'T', 'P']
-
 subvolume_data = dict()
 cmd = ["btrfs",  "subvolume", "list", mount_point]
 for line in subprocess.check_output(cmd).splitlines():
@@ -39,17 +72,14 @@ for line in subprocess.check_output(cmd).splitlines():
     except:
         subvolume_name = "(unknown)"
 
-    multiplicator = 1024 ** multiplicator_lookup.index(sys_args.unit)
-
     try:
         try:
             gid, total, unshared = args[0:3]
         except:
             continue
         try:
-            total = "%02.2f" % (float(total) / multiplicator)+sys_args.unit
-            unshared = "%02.2f" % (float(unshared) / multiplicator)+sys_args.unit
-        except ValueError as e:
+            total, unshared = bytes2human(float(total))+'iB', bytes2human(float(unshared))+'iB'
+        except ValueError:
             pass
         if '/' in gid:
           print("%s\t%s\t%s %s" % (
