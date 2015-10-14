@@ -1,0 +1,14 @@
+---
+- hosts: all
+  vars:
+    ansible_python_interpreter: "/usr/bin/env python2"
+  remote_user: root
+  tasks:
+  - name: Bootstrapscript to client
+    copy: src=disk_setup.py dest=/tmp/disk_setup.py mode=755
+    when: ansible_os_family == "Gentoo" and ansible_hostname == "livecd"
+  - shell: /tmp/disk_setup.py
+    name: Setup disks as needed
+    when: ansible_os_family == "Gentoo" and ansible_hostname == "livecd"
+    register: disk_setup
+  - debug: var=disk_setup.stdout_lines
