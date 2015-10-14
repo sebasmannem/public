@@ -32,6 +32,7 @@ if __name__ == "__main__":
   parser.add_argument('--vg', dest='vg', default='Volume00', help='VG to create or extend')
   parser.add_argument('-p', '--partition_table_type', dest='pttype', default='gpt', help='partitiontable type')
   parser.add_argument('-i', '--info', dest='info', action='store_true', help='Only show info and dont actually modify')
+  parser.add_argument('-m', '--mountpoint', dest='mountpoint', default='/mnt', help='Specify mountpoint to mount root to')
   parser.add_argument('--noswap', dest='swap', action='store_false', help='Dont create a swap lv.')
   parser.add_argument('--noroot', dest='root', action='store_false', help='Dont create a rot lv')
 
@@ -203,15 +204,15 @@ if __name__ == "__main__":
         print('Tried to create root btrfs filesystem, but failed. Please investigate..'.format(args.vg))
         sys.exit(1)
       try:
-        subprocess.check_call(['mount', cryptdevs[0], '/mnt/gentoo'], stdout=devnull, stdin=devnull, stderr=devnull)
+        subprocess.check_call(['mount', cryptdevs[0], args.mountpoint], stdout=devnull, stdin=devnull, stderr=devnull)
       except:
         print('Tried to mount root btrfs filesystem, but failed. Please investigate..'.format(args.vg))
         sys.exit(1)
       try:
-        os.makedirs('/mnt/gentoo/__snapshots')
-        subprocess.check_call(['btrfs', 'subvolume', 'create', '/mnt/gentoo/__active'], stdout=devnull, stdin=devnull, stderr=devnull)
-        subprocess.check_call(['btrfs', 'subvolume', 'create', '/mnt/gentoo/__empty'], stdout=devnull, stdin=devnull, stderr=devnull)
-        btrfs=subprocess.Popen(['btrfs', 'subvolume', 'list', '-t', '/mnt/gentoo'], stdin=devnull, stdout=subprocess.PIPE, stderr=devnull)
+        os.makedirs(args.mountpoint+'/__snapshots')
+        subprocess.check_call(['btrfs', 'subvolume', 'create', args.mountpoint+'/__active'], stdout=devnull, stdin=devnull, stderr=devnull)
+        subprocess.check_call(['btrfs', 'subvolume', 'create', args.mountpoint+'/__empty'], stdout=devnull, stdin=devnull, stderr=devnull)
+        btrfs=subprocess.Popen(['btrfs', 'subvolume', 'list', '-t', args.mountpoint], stdin=devnull, stdout=subprocess.PIPE, stderr=devnull)
         splitter_re=re.compile('\t+')
         for line in btrfs.stdout:
           line=line.decode('utf-8')
@@ -219,14 +220,14 @@ if __name__ == "__main__":
             line=line[:-1]
           ID, gen, top_level, path = splitter_re.split(line)[:4]
           if path=='__active':
-            subprocess.check_call(['btrfs', 'subvolume', 'set-default', ID, '/mnt/gentoo'], stdout=None, stdin=None, stderr=None)
+            subprocess.check_call(['btrfs', 'subvolume', 'set-default', ID, args.mountpoint], stdout=None, stdin=None, stderr=None)
             break
       except:
         print('Tried to init root btrfs filesystem, but failed. Please investigate..'.format(args.vg))
         sys.exit(1)
       try:
-        subprocess.check_call(['umount', '/mnt/gentoo'], stdout=devnull, stdin=devnull, stderr=devnull)
-        subprocess.check_call(['mount', cryptdevs[0], '/mnt/gentoo'], stdout=devnull, stdin=devnull, stderr=devnull)
+        subprocess.check_call(['umount', args.mountpoint], stdout=devnull, stdin=devnull, stderr=devnull)
+        subprocess.check_call(['mount', cryptdevs[0], args.mountpoint], stdout=devnull, stdin=devnull, stderr=devnull)
       except:
         print('Tried to remount root btrfs filesystem, but failed. Please investigate..'.format(args.vg))
         sys.exit(1)

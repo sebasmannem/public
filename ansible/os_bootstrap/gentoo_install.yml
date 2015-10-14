@@ -7,7 +7,7 @@
   - name: Bootstrapscript to client
     copy: src=disk_setup.py dest=/tmp/disk_setup.py mode=755
     when: ansible_os_family == "Gentoo" and ansible_hostname == "livecd"
-  - shell: /tmp/disk_setup.py
+  - shell: /tmp/disk_setup.py -m /mnt/gentoo
     name: Setup disks as needed
     when: ansible_os_family == "Gentoo" and ansible_hostname == "livecd"
     register: disk_setup
