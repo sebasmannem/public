@@ -1,4 +1,14 @@
-#!/bin/python
+#!/usr/bin/env python
+import hashlib
+def hash_for_file(fname, block_size=2**20):
+  md5 = hashlib.md5()
+  with open(fname, 'rb') as f:
+    while True:
+      data = f.read(block_size)
+      if not data:
+        break
+      md5.update(data)
+  return md5.digest()
 
 if __name__ == "__main__":
   import argparse
@@ -7,8 +17,9 @@ if __name__ == "__main__":
   import re
   import datetime
   parser = argparse.ArgumentParser(description='Sorts files in folders by YEAR/MONTH/DAY and places in subfolders according')
-#  parser.add_argument('--unit', metavar='U', type=str, default='G',help='SI Unit, [B]ytes, K, M, G, T, P',)
-#  parser.add_argument('mount_point', metavar='PATH', type=str, default='/', help='BTRFS mount point', )
+  parser.add_argument('-a', '--all', dest='all', action='store_true', help='Also process files that already seem to be in a Y/M/D location.')
+  parser.add_argument('-c', '--clean', dest='clean', action='store_true', help='Clean duplicate files.')
+  parser.add_argument('-q', '--quick', dest='quick', action='store_true', help='Dont compare file hashes. Rely on filesize solely.')
   parser.add_argument('args', nargs=argparse.REMAINDER)
   args = parser.parse_args()
   rootfolders = args.args
@@ -17,66 +28,72 @@ if __name__ == "__main__":
     sys.exit(1)
 
   cleaned_dirs=[]
-  YR_re=re.compile('[0-9]{4}')
+  YMD_sub_re=re.compile('\\b[0-9]{4}(/+[0-9]{2}){2}\\b')
+  YMD_re=re.compile('^[0-9]{4}(/+[0-9]{2}){2}$')
   for r in rootfolders:
-    if not r[-1] == '/': r+='/'
+    r = os.path.abspath(r) + '/'
     for d,subs,files in os.walk(r):
       reldir=d[len(r):]
-      if YR_re.match(reldir):
-        if len(reldir) == 4:
-          print('Folder: {0}: Looks like a year. Skipping.'.format(d))
+      if YMD_re.search(reldir):
+        print('Folder {0} was already sorted. Skipping.'.format(d))
+        continue
+      elif YMD_sub_re.search(reldir) and not args.all:
+        print('Folder {0} seems to be in an Y/M/D structure. Skipping. Please use -a to proces these too...'.format(d))
         continue
       else:
+        empty=True
         for f in files:
-          src = "{0}/{1}".format(d,f)
-          stat =os.stat(src)
-          stat.st_ctime
-          ctime=datetime.datetime.fromtimestamp(stat.st_ctime)
-          year,month,day = str(ctime.year), "{0:02d}".format(ctime.month), "{0:02d}".format(ctime.day)
-          dest = "{0}{1}/{2}/{3}/{4}".format(r,year,month,day,f)
-          if os.path.exists(dest):
-            print("Could not move '{0}'. Dest '{1}' already exists.".format(src,dest))
+          src = os.path.abspath(os.path.join(d,f))
+          src_stat = os.stat(src)
+          mtime=datetime.datetime.fromtimestamp(src_stat.st_mtime)
+          year,month,day = str(mtime.year), "{0:02d}".format(mtime.month), "{0:02d}".format(mtime.day)
+          dest = os.path.abspath("{0}{1}/{2}/{3}/{4}".format(r,year,month,day,f))
+          if src == dest:
+            pass
+          elif os.path.exists(dest):
+            dest_stat = os.stat(dest)
+            if os.path.islink(src):
+              if args.clean:
+                print("Cleaning symlink '{0}' ".format(src))
+                os.remove(src)
+              else:
+                print("Not moving '{0}' to '{1}' (src=symlink, dest=actual file)".format(src,dest))
+                empty=False
+            elif os.path.islink(dest):
+              print("mv '{0}' '{1}' (replace symbolic link by actual file)".format(src, dest))
+              os.renames(src, dest)
+            elif src_stat == dest_stat:
+              if args.clean:
+                print("Cleaning '{0}' (same inode as dest '{1}') ".format(src, dest))
+                os.remove(src)
+              else:
+                print("Not moving '{0}' to '{1}' (src and dest are same inode, use -c to clean)".format(src,dest))
+            elif src_stat.st_size != dest_stat.st_size:
+              print("Not moving '{0}' to '{1}' (both exist with different size)".format(src,dest))
+              empty=False
+            elif args.clean:
+              if args.quick:
+                print("Cleaning '{0}' (same size as dest '{1}') ".format(src, dest))
+                os.remove(src)
+              elif hash_for_file(src) != hash_for_file(dest):
+                empty=False
+                print("Not moving '{0}' to '{1}' (both exist with different hash digest)".format(src,dest))
+                continue
+              else:
+                print("Cleaning '{0}' (same hash digest as dest '{1}') ".format(src, dest))
+                os.remove(src)
+            else:
+              empty=False
+              print("Could not move '{0}'. Dest '{1}' already exists.".format(src,dest))
           else:
             print("mv '{0}' '{1}'".format(src, dest))
             os.renames(src, dest)
-        cleaned_dirs.append(d)
-'''
+        if empty:
+          cleaned_dirs.append(d)
   for d in cleaned_dirs[::-1]:
-    if os.path.is_dir(dest):
+    if os.path.isdir(d):
       try:
         os.rmdir(d)
+        print("Cleaned folder '{0}' (all files where processed).".format(d))
       except:
-        print("Could not clean up folder {0}. Please investigate".format(d))
-'''
-
-
-'''
-    echo -n "$path/$file"
-    if [ -d "$path/$file" ]
-    then
-      base=$(basename "$file")
-      echo "$file" | grep -qE '^[0-9]{4}$' && { echo " (folder - Looks like a year. Skipping.)" ; continue ; }
-
-      echo " (folder)"
-      path="$file"
-      processFolder "$root" "$path/$file"
-      rmdir "$path"
-      path=$(dirname "$path")
-    elif [ -f "$path/$file" ]
-    then
-      echo " (file)"
-      Created=$(exif -t 0x9003 "$file" 2>/dev/null | grep Value | cut -c10-100)
-      [ "$Created" = "" ] && Created=$(stat -c %y "$file")
-      Year=`echo "$Created" | cut -c1-4`
-      Month=`echo "$Created" | cut -c6-7`
-      Day=`echo "$Created" | cut -c09-10`
-
-      mkdir -p "$root/$Year/$Month/$Day"
-      mv "$file" "$root/$Year/$Month/$Day/"
-    else
-      echo " (unknown)"
-    fi
-
-
-
-'''
+        pass
