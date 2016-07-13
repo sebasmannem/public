@@ -1,0 +1,16 @@
+#!/usr/bin/env python2
+import json
+ret=[]
+try:
+    with open('/etc/oratab') as f:
+        for l in f:
+            try:
+                l=l.strip()
+                l=l.split('#')[0]
+                sid, home, start = l.split(':')[:3]
+                ret.append( {'sid': sid, 'home': home, 'autostart': start} )
+            except:
+                pass
+        print(json.dumps(ret))
+except:
+    pass
