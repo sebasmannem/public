@@ -1,13 +1,21 @@
 #!/bin/env python
+
+'''
+Aanpassingen die gedaan zijn voor RH5 complency:
+.format is aangepast naar "" % () of naar ""+""
+  print("Cleaned {0} files.".format(cleaned)) -> print("Cleaned %d files." % cleaned)
+  outfile="{0}/{1}{2}.totals.log".format(fldr,options.prefix,mdate) -> outfile=fldr+'/'+options.prefix+mdate+'.totals.log'
+onder RH5 wordt glob gebruikt ipv iglob
+with open().. is aangepast naar try .. finally ...
+'''
 def CleanFolder(fldr):
   if fldr[-1]=='\n': fldr=fldr[0:-1]
   cleaned=0
-  print("Cleaning folder {0}".format(fldr))
+  print("Cleaning folder %s" % fldr)
   files=[]
   for infile in iglob(fldr+'/'+options.filter):
     if infile[-11:] == '.totals.log' or infile[-14:] == '.totals.log.gz':
-      if options.verbose:
-        print("Skipping {0}".format(infile))
+      if options.verbose: print("Skipping %s" % infile)
       continue
     mdate=path.getmtime(infile)
     files.append((infile,mdate))
@@ -20,7 +28,7 @@ def CleanFolder(fldr):
   for file in files:
     infile,mtime=file
     mdate=datetime.fromtimestamp(mtime).strftime("%Y%m%d")
-    outfile='{0}/{1}{2}.totals.log'.format(fldr,options.prefix,mdate)
+    outfile=fldr+'/'+options.prefix+mdate+'.totals.log'
     if options.compress>0: outfile+='.gz'
     try:
       fo=outfiles[outfile]
@@ -32,23 +40,33 @@ def CleanFolder(fldr):
         fo = open(outfile,'a')
       outfiles[outfile]=fo
 
-    with open(infile) as fi:
+    try:
+      fi=open(infile)
       for line in fi:
         fo.write(line)
-    if options.verbose: print("File {0} Done".format(infile))
+    finally:
+      fi.close()
+    if options.verbose: print("File "+infile+" Done")
     remove(infile)
     cleaned+=1
-  print("Cleaned {0} files.".format(cleaned))
-  for outfile, of in outfiles.items():
-    of.close()
+  print("Cleaned %d files." % cleaned)
+  for outfile, fo in outfiles.items():
+    fo.close()
 
 if __name__ == "__main__":
   from optparse import OptionParser, OptionGroup
-  from glob import iglob
+  from sys import stdin, hexversion
+  import gzip
+  from os import path
+
+  #Onder RH5 werkt iglob niet. Grmbl...
+  if hexversion < 33949424:
+    from glob import glob as iglob
+  else:
+    from glob import iglob
+
   from os import path, remove
   from datetime import datetime
-  import gzip
-  from sys import stdin
 
   parser = OptionParser(usage='Usage: %prog [options] [folders]')
   parser.add_option("-z", "--compress", "--zip", dest="compress", type="int", help="Set the compression level (gzip) for the output files. 0 (default) is no encryption.", default=0)

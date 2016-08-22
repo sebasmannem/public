@@ -1,0 +1,18 @@
+#!/bin/sh
+ERRORS=0
+for SVC in axway sonic oracle jboss rhq-agent actional axwayKeten
+do
+  if [ -x "/etc/init.d/$SVC" ]; then
+    echo "Start and enable $SVC"
+  else
+    echo "Service $SVC not registered"
+    continue
+  fi
+  /sbin/service $SVC start
+  [ $? -ne 0 ] && ERRORS=$(($ERRORS+1)) || /sbin/chkconfig $SVC on
+  [ $? -ne 0 ] && ERRORS=$(($ERRORS+1))
+done
+
+if [ $ERRORS -eq 0 ]; then
+  /stage/oracle/scripts/bash/srvmgmt.sh patchlist_app_up
+fi

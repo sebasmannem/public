@@ -1,0 +1,24 @@
+#!/bin/sh
+ERRORS=0
+sudo dmidecode -s system-product-name | grep -q VMware && VM=1 || VM=0
+
+for SVC in axway sonic oracle jboss rhq-agent actional axwayKeten
+do
+  if [ -x "/etc/init.d/$SVC" ]; then
+    echo "Stop and disable $SVC"
+  else
+    echo "Service $SVC not registered"
+    continue
+  fi
+  /sbin/service $SVC stop
+  [ $? -ne 0 ] && ERRORS=$(($ERRORS+1)) || /sbin/chkconfig $SVC off
+  [ $? -ne 0 ] && ERRORS=$(($ERRORS+1))
+done
+
+if [ $ERRORS -eq 0 ]; then
+  /stage/oracle/scripts/bash/srvmgmt.sh patchlist_app_down
+  if [ $VM -eq 1 ]; then
+    echo "Shutdown server"
+    /sbin/init 0
+  fi
+fi

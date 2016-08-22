@@ -21,7 +21,6 @@ You can pipe (cat *.csv | %prog) the downloaded csv's into %prog and he will sho
   re_Date = re.compile('[0-9]{2,4}-[0-9]{2}-[0-9]{2,4}')
   re_Time = re.compile('[0-9]{2}:[0-9]{2}(:[0-9]{2})?')
   re_BA = re.compile('^(.*?) / ([A-Z]+)')
-  #NL078744-SODEXO / GOUDA         008 381063 MJW5FT               ING BANK NV PASTRANSACTIES
   rdr = csv.reader(stdin, delimiter=',', quotechar='"')
   myRek=options.accounts.split(",")
 
@@ -62,7 +61,6 @@ You can pipe (cat *.csv | %prog) the downloaded csv's into %prog and he will sho
           if BA:
             rek=BA.group(1)
             oms="te {}".format(BA.group(2))
-            #NL078744-SODEXO / GOUDA         008 381063 MJW5FT               ING BANK NV PASTRANSACTIES      
           else:
             rek='bet.aut.'
             oms='Betalen met pin'

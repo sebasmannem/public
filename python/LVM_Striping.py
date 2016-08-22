@@ -13,7 +13,6 @@ if __name__ == "__main__":
   parser.add_option("-l", "--loud", dest="silent", action="store_false", help="Extra output on stderr", default=True)
   parser.add_option("-v", "--volumename", dest="volume", default="Volume{0:0>2}", help="Naming convention. Default: Volume00, volume01 - Volume99.")
 
-
   (options, args) = parser.parse_args()
 
   if options.action=='examples':
@@ -31,7 +30,7 @@ The following can be done:
   sudo {0} -a auto
 
 Please be aware that this script can only attached devices of the same size (in MiB).
-Devices with different sizes will end up in differenet Volumes.'''.format(__file__)
+Devices with different sizes will end up in different Volumes.'''.format(__file__)
     exit()
 
   if os.getuid() != 0:
@@ -57,18 +56,19 @@ Devices with different sizes will end up in differenet Volumes.'''.format(__file
     except:
       print "pyparted is needed and autoinstall dit not finish correctly. Please install by hand with\nsudo yum install pyparted"
       exit(1)
+  from _ped import DiskLabelException 
 
   #drives=glob.glob('/dev/[vs]d*')
   drives=set()
   stderr.write("\nHarvesting block devices with lsblk.\n")
-  p=subprocess.Popen(['lsblk','-d','-o','NAME','-n'], stdout=subprocess.PIPE, stderr=stderr)
+  p=subprocess.Popen(['lsblk','-d','-o','NAME','-n'], stdout=subprocess.PIPE,stderr=stderr)
   for d in p.stdout:
     d=d.replace('\n','')
     drives.add('/dev/'+d)
 
   volumes=set()
   stderr.write("\nHarvesting volume groups.\n")
-  p=subprocess.Popen(['vgs','--noheadings','-o','vg_name'], stdout=subprocess.PIPE, stderr=stderr)
+  p=subprocess.Popen(['vgs','--noheadings','-o','vg_name'],stdout=subprocess.PIPE, stderr=stderr)
   for v in p.stdout:
     v=v.replace('\n','')
     v=v.replace(' ','')
@@ -94,12 +94,12 @@ Devices with different sizes will end up in differenet Volumes.'''.format(__file
         stderr.write("Drive is not empty. Skipping.\n")
         empty_drives.discard(d)
         continue
-    except parted.DiskLabelException:
+    except DiskLabelException:
       pass
     except Exception as e:
       stderr.write("Exception: {0}\n".format(e))
       continue
-    size=dev.getLength('MiB')
+    size=dev.getSize()
     if size in drv_by_size:
       drv_by_size[size].add(dev)
     else:
@@ -132,19 +132,30 @@ Devices with different sizes will end up in differenet Volumes.'''.format(__file
     else:
       try:
         drvnames=[]
+        '''
+        #Dit was eigenlijk de bedoelding, maar laat om onduidelijke reden ruimte 16G vrij voor partitie???
+        drvnames=[]
         for dev in drvs:
           disk=parted.freshDisk(dev, 'msdos')
-          geometry = parted.Geometry(device=dev, start=1, length=dev.getLength() - 1)
+          geometry = parted.Geometry(device=dev, start=1, length=dev.length - 1)
           filesystem = parted.FileSystem(type='ext3', geometry=geometry)
           partition = parted.Partition(disk=disk, type=parted.PARTITION_NORMAL, fs=filesystem, geometry=geometry)
           disk.addPartition(partition=partition, constraint=dev.optimalAlignedConstraint)
           partition.setFlag(parted.PARTITION_LVM)
           disk.commit()
           drvnames.append(dev.path+'1')
+        #dan maar parted zelf aanroepen.'''
+        drvnames=sorted([d.path for d in drvs])
+        for drv in drvnames:
+          subprocess.check_call(['parted','-s',drv,'mklabel','msdos'],stdout=stderr, stderr=stderr)
+          subprocess.check_call(['parted','-s',drv,'--','mkpart','primary','ext3','1','-1'],stdout=stderr, stderr=stderr)
+          subprocess.check_call(['parted','-s',drv,'set','1','lvm','on'],stdout=stderr, stderr=stderr)
+
+        drvnames=sorted([str(d.path)+'1' for d in drvs])
         subprocess.check_call(['pvcreate']+drvnames,stdout=stderr, stderr=stderr)
         subprocess.check_call(['vgcreate',next_vol]+drvnames,stdout=stderr, stderr=stderr)
-        subprocess.check_call(['lvcreate','-n','LogVol01','-i',str(len(drvnames)),'-I','1M','-l', '100%FREE',next_vol],stdout=stderr, stderr=stderr)
-        subprocess.check_call(['mkfs.ext4','/dev/mapper/{0}-LogVol01'.format(next_vol)],stdout=stderr, stderr=stderr)
+        subprocess.check_call(['lvcreate','-n','LogVol00','-i',str(len(drvnames)),'-I','1M','-l', '100%FREE',next_vol],stdout=stderr, stderr=stderr)
+        subprocess.check_call(['mkfs.ext4','/dev/mapper/{0}-LogVol00'.format(next_vol)],stdout=stderr, stderr=stderr)
       except Exception, e:
         print 'Error occurred during creation of {0}:\n{1}'.format(next_vol,e)
         errs+=1
