@@ -37,6 +37,8 @@ def human2bytes(s):
 
 import argparse
 import subprocess
+import re
+subvolid_re = re.compile('^\d+/\d+$')
 
 parser = argparse.ArgumentParser(
     description='Gives quotas from a BTRFS filesystem in a readable form'
@@ -51,6 +53,13 @@ parser.add_argument(
     default='/',
     help='BTRFS mount point',
 )
+parser.add_argument(
+    '-c', '--clean',
+    action='store_true',
+    help='Clean quotegroups of unknown subvolumes',
+)
+
+
 sys_args = parser.parse_args()
 mount_point = sys_args.mount_point
 
@@ -60,8 +69,8 @@ for line in subprocess.check_output(cmd).splitlines():
     args = str(line, encoding='utf8').split()
     subvolume_data[int(args[1])] = args[-1]
 
-print("subvol\t\t\t\t\t\tgroup         total    unshared")
-print("-" * 79)
+print("%s\t%s\t%s %s" % ('subvol'.ljust(97), 'group', 'total'.rjust(10), 'unshared'.rjust(10)))
+print("-" * 133)
 cmd = ["btrfs", "qgroup", "show", mount_point]
 for line in subprocess.check_output(cmd).splitlines():
     args = str(line, encoding='utf8').split()
@@ -70,6 +79,10 @@ for line in subprocess.check_output(cmd).splitlines():
         subvolume_id = args[0].split('/')[-1]
         subvolume_name = subvolume_data[int(subvolume_id)]
     except:
+        if sys_args.clean and subvolid_re.search(str(args[0])):
+            cmd = ["btrfs", "qgroup", "destroy", args[0], mount_point]
+            subprocess.check_call(cmd)
+            continue
         subvolume_name = "(unknown)"
 
     try:
@@ -83,7 +96,7 @@ for line in subprocess.check_output(cmd).splitlines():
             pass
         if '/' in gid:
           print("%s\t%s\t%s %s" % (
-            subvolume_name.ljust(40),
+            subvolume_name.ljust(97),
             gid,
             total.rjust(10), 
             unshared.rjust(10), 
