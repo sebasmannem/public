@@ -117,7 +117,7 @@ def urls_generator(urls):
 
     
 parser = argparse.ArgumentParser(description='Lists all packages in a yum repo')
-parser.add_argument('-u', '--urls', default='http://testbase.splendiddata.com/postgrespure/3/[centos/7,fedora/23,rhel/7,sles/12]/[x86_64,ppc64le]/', help='urls of repos to check packages from. you can use expansion with [value1,value1])')
+parser.add_argument('-u', '--urls', default='http://testbase.splendiddata.com/postgrespure/3/[centos/7,fedora/23,rhel/7Server,sles/12]/[x86_64,ppc64le]/', help='urls of repos to check packages from. you can use expansion with [value1,value1])')
 
 options = parser.parse_args()
 repos={}
