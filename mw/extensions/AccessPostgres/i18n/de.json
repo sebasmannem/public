@@ -1,0 +1,17 @@
+{
+	"@metadata": {
+		"authors": [
+			"S. Mannem",
+			"M. Mostert"
+		]
+	},
+        "accesspostgres-desc": "Sammlung von Funktionen, um ein select, insert oder update in einer PostgreSQL Datenbank durchzuführen.",
+        "missing-fields": "Nicht genügend Parameter.",
+        "connection-failure": "Der Verbindungsaufbau ist fehlgeschlagen. Falsche Verbindungsparameter?",
+        "query-aborted": "Abfrage fehlgeschlagen",
+        "format-missing": "Formatangabe für Rückgabeart fehlt.",
+        "no-select": "Die Abfrage ist keine select-Anweisung",
+        "error": "Fehler",
+        "missing-db": "Datanbanknahme fehlt",
+        "missing-user": "Benutzername fehlt"
+}

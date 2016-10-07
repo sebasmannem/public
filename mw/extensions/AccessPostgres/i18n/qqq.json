@@ -1,0 +1,17 @@
+{
+        "@metadata": {
+                "authors": [
+                        "S. Mannem",
+                        "M. Mostert"
+                ]
+        },
+        "accesspostgres-desc": "{{desc|nameAccess Postgres=|url=https://www.mediawiki.org/wiki/Extension:AccessPostgres}}",
+        "missing-fields": "Raised when fields are missing in function call.",
+        "connection-failure": "Raised when database could not be connected.",
+        "query-aborted": "Raised when query was aborted",
+        "format-missing": "Raised when return type of function has an unknown format.",
+        "no-select": "Raised when a query is parsed, that is no SELECT statement",
+        "error": "General description for an error",
+        "missing-db": "Raised when no database name is specified.",
+        "missing-user": "Raised when no database user is specified."
+}
