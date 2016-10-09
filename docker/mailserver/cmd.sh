@@ -1,0 +1,1 @@
+docker run -d -t -v /sys/fs/cgroup:/sys/fs/cgroup:ro -v /u01/mailserver/config:/config -v /u01/mailserver/home:/home -h mail.mannem.nl -p 25:25 -p 995:995 -p 110:110 -p 465:465 -e "PASSWORD=$MAILPASSWORD" --restart=always sebasmannem/c7-systemd-mailserver /run_all.sh

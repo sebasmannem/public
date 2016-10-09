@@ -89,3 +89,5 @@ ENV/
 .ropeproject
 =======
 python/__pycache__/*
+
+/docker/oracle_rdbms/Disk1/

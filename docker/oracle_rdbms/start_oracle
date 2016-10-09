@@ -1,0 +1,6 @@
+#!/bin/bash
+sed -i "s/(HOST = [^)]*)/(HOST = $(hostname))/" /u01/app/oracle/product/11.2.0/xe/network/admin/listener.ora
+/etc/init.d/oracle-xe start
+
+#Wait forever so that the container will keep running
+cat
