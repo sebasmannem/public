@@ -1,0 +1,78 @@
+# Please run with:  ansible-playbook -i staging/inventory_test_db test_oracle_sql.yml -K -M libraries/
+- hosts: all
+  tasks:
+  - name: create user sebas on D127T
+    oracle_sql:
+      query: "{{ item.query }}"
+      creates: "{{ item.creates }}"
+      sysdba: true
+      databases: 'D127T'
+    environment:
+      LD_LIBRARY_PATH: /u01/app/oracle/product/11.2.0.4.160419/db/lib
+    become: true
+    become_user: oracle
+    become_method: sudo
+    with_items:
+      - { query: "create user sebas identified by mannem", creates: "select * from dba_users where username = 'SEBAS'" }
+      - { query: "grant dba to sebas", creates: '' }
+
+  - name: create user sebas
+    oracle_sql:
+      query: "{{ item }}"
+      creates: "select * from dba_users where username = 'SEBAS'"
+      sysdba: true
+      databases: 'D.*T'
+    environment:
+      LD_LIBRARY_PATH: /u01/app/oracle/product/11.2.0.4.160419/db/lib
+    become: true
+    become_user: oracle
+    become_method: sudo
+    ignore_errors: true
+    with_items:
+    - "create user sebas identified by mannem"
+    - "grant dba to sebas"
+
+  - name: select user sebas using easeconnect to host
+    oracle_sql:
+      query: "select * from dba_users where username = 'SEBAS'"
+      databases: 'D127T.addji.minjus.nl'
+      host: djitora130
+      user: sebas
+      password: mannem
+    environment:
+      LD_LIBRARY_PATH: /u01/app/oracle/product/11.2.0.4.160419/db/lib
+      ORACLE_HOME: /u01/app/oracle/product/11.2.0.4.160419/db
+    become: true
+    become_user: oracle
+    become_method: sudo
+    register: dba_users
+    ignore_errors: true
+
+  - name: print dba_objects
+    debug: var=dba_users
+
+  - name: drop user sebas from D127T
+    oracle_sql:
+      query: "drop user sebas cascade"
+      removes: "select * from dba_users where username = 'SEBAS'"
+      sysdba: true
+      databases: 'D127T'
+    environment:
+      LD_LIBRARY_PATH: /u01/app/oracle/product/11.2.0.4.160419/db/lib
+    become: true
+    become_user: oracle
+    become_method: sudo
+
+  - name: drop user sebas
+    oracle_sql:
+      query: "drop user sebas cascade"
+      removes: "select * from dba_users where username = 'SEBAS'"
+      sysdba: true
+      databases: 'D.*T'
+    environment:
+      LD_LIBRARY_PATH: /u01/app/oracle/product/11.2.0.4.160419/db/lib
+    become: true
+    become_user: oracle
+    become_method: sudo
+    ignore_errors: true
+

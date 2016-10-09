@@ -1,0 +1,18 @@
+- hosts: all
+#  become: true
+#  become_user: root
+  tasks:
+  - name: Add 192.168.0.0/24
+    pg_hba: dest=~/pg_hba.conf contype=host source=192.168.8.0 netmask=255.255.255.0 method=md5 backup=true order=sud state="{{ item }}"
+    register: pg_hba_backup
+    with_items:
+    - present
+    - absent
+  - name: print
+    debug: var=pg_hba_backup
+  - name: read pg_hba rules
+    pg_hba: dest=~/pg_hba.conf
+    register: pg_hba
+  - name: print
+    debug: var=pg_hba
+

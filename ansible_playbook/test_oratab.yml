@@ -1,0 +1,30 @@
+- hosts: all
+  become: true
+  become_user: root
+  tasks:
+  - name: remove testfile
+    file: dest=/tmp/blaat state=absent
+  - name: add sid to oratab
+    become: true
+    become_user: root
+    oratab: dest=/tmp/blaat sid="{{ item }}" home=/etc/oracle/dbhome enabled=yes state=present create=yes sorted=yes
+    with_items:
+    - D999Z
+    - D000A
+    - D111B
+  - name: change sid in oratab
+    become: true
+    become_user: root
+    oratab: dest=/tmp/blaat sid=D111B home=/etc/oracle/dbhome2 enabled=no
+  - name: read oratab entries
+    oratab: dest=/tmp/blaat
+    register: oratab
+  - name: print
+    debug: var=oratab
+
+  - name: change homes:
+    become: true
+    become_user: root
+    oratab: dest=/tmp/blaat sid="{{ item.sid }}" home=/etc/oracle/dbhome3 enabled="{{ item.enabled }}"
+    with_items: "{{ oratab.oratab }}"
+    when: "{{ item.home}} = '/etc/oracle/dbhome'"
