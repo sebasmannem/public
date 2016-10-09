@@ -1,0 +1,51 @@
+#!/usr/bin/python
+import sys
+ind=quote=0
+inp = "".join(sys.stdin.readlines())
+i=0
+while i<len(inp):
+    c=inp[i]
+    if c == "(":
+      ind+=2
+      sys.stdout.write("\n"+" "*ind+c)
+    elif c == ")":
+      ind-=2
+      sys.stdout.write(c)
+      i+=1
+      while i<len(inp) and inp[i] in ' \t)\n':
+        if inp[i] == ')':
+          sys.stdout.write(inp[i])
+          ind-=2
+        i+=1
+      i-=1
+      if ind==0:
+        sys.stdout.write("\n\n")
+    elif c == "=":
+      if inp[i-1] !=" ":
+        sys.stdout.write(" ")
+      sys.stdout.write(c)
+      if i+1<len(inp) and inp[i+1] != " ":
+        sys.stdout.write(" ")
+    elif c == "\n":
+      pass
+    elif c in " \t":
+      sys.stdout.write(c)
+      while i+1<len(inp) and inp[i+1] in ' \t':
+        i+=1
+    elif c == "#":
+      while i<len(inp) and inp[i] != '\n':
+        i+=1
+    elif c == '"':
+      sys.stdout.write('"')
+      i+=1
+      while i<len(inp) and inp[i] != '"':
+        sys.stdout.write(inp[i])
+        i+=1
+      if i==len(inp):
+        quote=1
+        break
+      else:
+        sys.stdout.write('"')
+    else:
+      sys.stdout.write(c)
+    i+=1

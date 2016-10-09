@@ -1,0 +1,17 @@
+{
+	"@metadata": {
+		"authors": [
+			"S. Mannem",
+			"M. Mostert"
+		]
+	},
+        "accesspostgres-desc": "Een aantal functies om select, insert or update uit te kunnen voeren op een PostgreSQL database.",
+        "missing-fields": "Te weinig paramaters.",
+        "connection-failure": "Connectie maken met de database is muslukt. Onvolledig aantal / onjuiste parameters voor connectie?",
+        "query-aborted": "Query afgebroken",
+        "format-missing": "Formaat specificatie van het return type mist.",
+        "no-select": "Query is geen select statement",
+        "error": "Fout",
+        "missing-db": "Database naam niet gespecificeert",
+        "missing-user": "Database gebruiker niet gespecificeert"
+}

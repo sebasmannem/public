@@ -1,0 +1,525 @@
+#!/bin/bash
+#
+# Script	:	oralib
+# Purpose	:	Library with all general Oracle functions
+# Author	:      	Sebastiaan Mannem
+# Date		:	10/04/12
+
+# tee >(proces1) >(proces2) | lastproces
+# ls -A | tee >(grep ^[.] > hidden-files) >(grep -v ^[.] > normal-files) | less
+
+function oraLogger()
+{
+  [ "$DONTLOG" ] && logfile=/dev/null
+  awk '{print strftime("%Y-%m-%d %H:%M:%S"),"'"$LOGCH"'",$0}' >> "$logfile"
+}
+
+function oraLoggerWithOutput()
+{
+  [ "$DONTLOG" ] && logfile=/dev/null
+  tee >(awk '{print strftime("%Y-%m-%d %H:%M:%S"),"'"$LOGCH"'",$0}' >> "$logfile")
+}
+
+function echo_result()
+{
+  if [ "$1" = "OK" ]; then
+    color=$SETCOLOR_SUCCESS
+    msg="   OK   "
+  elif [ "$1" = "FAILED" ]; then
+    color=$SETCOLOR_FAILURE
+    msg=" FAILED "
+  elif [ "$1" = "WARNING" ]; then
+    color=$SETCOLOR_WARNING
+    msg="WARNING "
+  elif [ "$1" = "PASSED" ]; then
+    color=$SETCOLOR_WARNING
+    msg=" PASSED "
+  fi
+
+  [ "$BOOTUP" = "color" ] && $MOVE_TO_COL
+  echo -n "["
+  [ "$BOOTUP" = "color" ] && $color
+  echo -n "$msg"
+  [ "$BOOTUP" = "color" ] && $SETCOLOR_NORMAL
+  echo -n "]"
+  echo -ne "\r"
+
+  echo
+  echo "Previous command ended with [$msg]" | oraLogger
+}
+
+function echo_head()
+{
+  # Geeft de regel waar OK, FAILED, etc na geprint wordt. Plaatst hem ook in de logfile...
+  echo -n "$@"
+  echo "$@" | oraLogger
+}
+
+function echo_success()
+{
+  echo_result OK
+  [ "$@" ] && echo $@ | oraLoggerWithOutput
+  return 0
+}
+
+function echo_failure()
+{
+  echo_result FAILED
+  failures=`echo $(($failures+1))`
+  [ "$1" ] && echo $@ | oraLoggerWithOutput
+  if [ $quitonerror ]; then
+    echo Errors have occurred during processing.
+    [ "$logfile" -a "$logfile" != '/dev/null' ] && echo Please check $logfile for more info.
+    echo Please fix the errors and repair the cluster registration by hand.
+    echo After repair you can retry by using this script, or by hand.
+    exit 1
+  fi
+  return 1
+}
+
+function echo_warning()
+{
+  echo_result WARNING
+  [ "$@" ] && echo $@ | oraLoggerWithOutput
+  return 0
+}
+
+function echo_passed()
+{
+  echo_result PASSED
+  [ "$@" ] && echo $@ | oraLoggerWithOutput
+  return 0
+}
+
+function quitOnError()
+{
+  quitonerror=1
+  echo_failure $@
+}
+
+function sidFromOratab()
+{
+  SID=`awk 'BEGIN {IGNORECASE=1;FS=":"} {sub("#.*","",$0)} /'$1'/ {print $1}' /etc/oratab | sort -u | tail -n1`
+  echo $SID
+}
+
+function homeFromInventory()
+{
+  [ ${oraInv} ] || return 0
+  for home in `awk 'BEGIN{IGNORECASE=1}/REMOVED/{$0=""}/'$1'/{split($3,s,"=");split(s[2],t,"\"");print t[2]}' ${oraInv}`
+  do
+    validPath $home
+  done
+}
+
+function homeFromOratab()
+{
+  [ "$1" ] && fltr=$1 || fltr='..*'
+  for home in `awk 'BEGIN{IGNORECASE=1;FS=":"} {sub("#.*","",$0)} $1~/^'$fltr'$/{print $2}' /etc/oratab | sort -u`
+  do
+    validPath $home
+  done
+}
+
+function validPath()
+{
+  home=$1
+  if [ -d $home ]; then
+    echo $home
+    return 0
+  else
+    return 1
+  fi
+}
+
+function DBHomeVersion()
+{
+  if [ -f $1 ]; then
+    strings $1 | awk '/NLSRTL/{print $3}'
+  elif [ -f $1/bin/oracle ]; then
+    strings $1/bin/oracle | awk '/NLSRTL/{print $3}'
+  elif [ -f $1/bin/crsctl ]; then
+    $1/bin/crsctl query crs activeversion | awk 'BEGIN{FS="["} {sub("]","",$2);print $2}'
+  fi
+}
+
+function Oracle64bit()
+{
+  [ -f $1/bin/crsd.bin ] && bin="$1/bin/crsd.bin"
+  [ -f $1/bin/oracle ] && bin="$1/bin/oracle"
+  [ ! -f $bin ] && bin=`locate oracle | tail -n1`
+  [ ! -f $bin ] && return 1
+  [ `file $bin | grep -c 'x86-64'` -eq 1 ] && echo x86_64 || echo x86
+  return 0
+}
+
+
+function set_vars()
+{
+  [ -x "$0" ] && export LOGCH=$(basename $0 .sh)
+  echo_head "Managing targets on host `hostname`"
+  echo
+
+  [ -z "${CONSOLETYPE:-}" ] && CONSOLETYPE="`/sbin/consoletype`"
+  if [ "$CONSOLETYPE" = "serial" ]; then
+    BOOTUP=serial
+    MOVE_TO_COL=
+    SETCOLOR_SUCCESS=
+    SETCOLOR_FAILURE=
+    SETCOLOR_WARNING=
+    SETCOLOR_NORMAL=
+  else
+    BOOTUP=color
+    RES_COL=60
+    MOVE_TO_COL="echo -en \\033[${RES_COL}G"
+    SETCOLOR_SUCCESS="echo -en \\033[1;32m"
+    SETCOLOR_FAILURE="echo -en \\033[1;31m"
+    SETCOLOR_WARNING="echo -en \\033[1;33m"
+    SETCOLOR_NORMAL="echo -en \\033[0;39m"
+    LOGLEVEL=1
+  fi
+
+  echo_head "Checking for existence of /etc/oratab"
+  if [ ! -f /etc/oratab ]; then
+    echo_failure
+    return 1
+  else
+    echo_success
+  fi
+
+  oraInv=`awk 'BEGIN{FS="="} $1=="inventory_loc" {print $2}' /etc/oraInst.loc`/ContentsXML/inventory.xml
+  echo_head "Check if Inventory file exists"
+  [ -f $oraInv ] || unset oraInv
+  [ $oraInv ] && echo_success || echo_failure
+  echo oraInv: $oraInv | oraLogger
+
+  echo_head "Discovering AG_HOME"
+  AG_HOME=`homeFromOratab 'ag.*' | sort -u | tail -n1`
+  [ ! $AG_HOME ] && AG_HOME=`homeFromInventory agent|tail -n1`
+  [ ! $AG_HOME ] && AG_HOME=`validPath /u01/app/oracle/product/10.2.0/agent10g`
+  [ $AG_HOME ] && echo_success || echo_passed
+  echo AG_HOME: $AG_HOME | oraLogger
+
+  echo_head "Discovering CRS_HOME"
+  CRS_HOME=`homeFromOratab crs`
+  [ ! $CRS_HOME ] && CRS_HOME=`homeFromInventory crs|tail -n1`
+  [ ! $CRS_HOME ] && CRS_HOME=`validPath /u01/crs/oracle/product/10.2.0/crs_1`
+  [ $CRS_HOME ] && echo_success || echo_passed "No CRS Home detected"
+  echo CRS_HOME: $CRS_HOME | oraLogger
+
+  echo_head "Discovering ASM_HOME"
+  ASM_HOME=`homeFromInventory asm`
+  [ ! $ASM_HOME ] && ASM_HOME=`homeFromOratab +asm.`
+  [[ (-z $ASM_HOME) && -n $CRS_HOME ]] && ASM_HOME=$(validPath $($CRS_HOME/bin/srvctl config asm -n $(hostname) | awk '{print $2}'))
+  [ ! $ASM_HOME ] && ASM_HOME=`validPath /u01/crs/oracle/product/10.2.0/asm_1`
+  [ -x $ASM_HOME/bin/oracle ] && echo_success || echo_passed "No ASM Home detected"
+  echo ASM_HOME: $ASM_HOME | oraLogger
+
+  echo_head "Discovering OMS_HOME"
+  OMS_HOME=`homeFromOratab oms`
+  [ ! $OMS_HOME ] && OMS_HOME=`homeFromInventory oms|tail -n1`
+  [ ! $OMS_HOME ] && OMS_HOME=`validPath /u01/app/oracle/product/10.2.0/oms10g`
+  [ $OMS_HOME ] && echo_success || echo_passed "No OMS Home detected"
+  echo OMS_HOME: $OMS_HOME | oraLogger
+
+  echo_head "Discovering TNS_ADMIN"
+  [ ! $TNS_ADMIN ] && TNS_ADMIN=`validPath /u01/app/oracle/admin/network`
+  [ $TNS_ADMIN ] && echo_success || echo_warning "TNS Admin folder could not be detected."
+  export TNS_ADMIN
+  echo TNS_ADMIN: $TNS_ADMIN | oraLogger
+
+  echo_head "Discovering ORACLE_BASE"
+  [ ! "$ORACLE_BASE" ] && ORACLE_BASE=`validPath /u01/app/oracle`
+  [ "$ORACLE_BASE" ] && echo_success || echo_warning "ORACLE_BASE folder could not be detected."
+  export ORACLE_BASE
+  echo ORACLE_BASE: $ORACLE_BASE | oraLogger
+
+  echo_head "Discovering CMAN_HOME"
+  CMAN_HOME=`homeFromOratab cl11g`
+#  [ ! $CMAN_HOME ] && CMAN_HOME=`homeFromInventory client|tail -n1`
+  [ ! $CMAN_HOME ] && CMAN_HOME=`validPath /u01/app/oracle/product/11.2.0/cl_1` 
+  echo CMAN_HOME: $CMAN_HOME | oraLogger
+  if [ $CMAN_HOME ]; then
+    echo_success
+    export CMAN_TARGET=`awk 'BEGIN{FS="="} {split($0,a,"#");$0=a[1]} /cman_.*=/ {print $1}' $TNS_ADMIN/cman.ora`
+  else
+    echo_passed "No CMAN Home detected."
+  fi
+  [ "$CMAN_TARGET" ] && echo "CMAN_TARGET: $CMAN_TARGET" | oraLoggerWithOutput
+
+  [ ! -x "$TIME_OUT" -a "$1" ] || TIME_OUT=$(dirname "$1")/timeout.sh
+  [ -x "$TIME_OUT" ] || TIME_OUT=/usr/local/bin/timeout.sh
+  [ -x "$TIME_OUT" ] || TIME_OUT=/home/oracle/bin/timeout.sh
+  [ -x "$TIME_OUT" ] || TIME_OUT=/stage/oracle/scripts/bash/timeout.sh
+  echo "TIME_OUT: $TIME_OUT" | oraLogger  
+
+  echo_head "Discovering gapw.ini"
+  if [ -f "$GAPWINI" ]; then
+    export GAPWINI=$GAPWINI
+  elif [ -f /usr/local/bin/ini/gapw.ini ]; then
+    export GAPWINI=/usr/local/bin/ini/gapw.ini
+  else
+    hostname | grep -iq 'srvp' && export GAPWINI=/usr/local/bin/ini/gapw.prod.ini || GAPWINI=/usr/local/bin/ini/gapw.ota.ini
+  fi
+  [ -f "$GAPWINI" ] && echo_success "$GAPWINI" || echo_warning "Could not find gapw.ini file."
+  echo GAPWINI: $GAPWINI | oraLogger
+
+  export NLS_DATE_FORMAT="dd-mm-yyyy hh24:mi:ss"
+  export ORALIB=1
+}
+
+function killByPath()
+{
+  [ $1 ] || return 1
+  [ -e $1 ] || return 1
+  awk_prg='BEGIN{ORS=" "} $8~/'$(echo $1 | sed 's|/|\\/|g')'/{print $2}'
+  PSs=`ps -ef | awk "$awk_prg"`
+  [ "$PSs" ] && kill $PSs
+  sleep 5
+  PSs=`ps -ef | awk "$awk_prg"`
+  [ "$PSs" ] && kill -9 $PSs
+}
+
+function timeout()
+{
+#Voorbeeld aanroep:
+#timeout -t 5 sleep 10 2>/dev/null
+# 2>/dev/null voorkomt een melding zoals:
+#/home/oracle/bin/srvmgmt.sh: line 1104: 14604 Terminated              /home/oracle/bin/timeout.sh $@ 2>&1
+  if [ ! "$TIME_OUT" ]; then
+    echo '$TIME_OUT not set. (Maybe you should run set_vars???'
+    return 1
+  else
+#    echo "$TIME_OUT $@"
+    "$TIME_OUT" $@ 2>&1
+  fi
+}
+
+function cn()
+{
+  [ -x $CRS_HOME/bin/cemutlo ] && $CRS_HOME/bin/cemutlo -n
+}
+
+function rn()
+{
+  [ -x $CRS_HOME/bin/olsnodes ] && $CRS_HOME/bin/olsnodes | sort || hostname
+}
+
+function getpw()
+{
+  [ -r $GAPWINI ] || return 1
+  [ $1 ] && USR=$1 || return 2
+  [ $2 ] && CH=$2 || CH=$ORACLE_SID
+  echo $CH | grep -qiE 'D[0-9][0-9][0-9][A-Z]' && CH=${CH:0:5}
+  sed -n 's/#.*//;/\['$CH'-DBA\]/I,/^\[/{/'$USR'=/I{s/'$USR'=//I;p}}' $GAPWINI | head -n1
+}
+
+function run_oms()
+{
+  [ $OMS_HOME ] && timeout -t 10 $OMS_HOME/bin/emctl $1 oms
+}
+ 
+function run_cman()
+{
+  [ ! $CMAN_HOME ] && return 0
+
+  target=`awk 'BEGIN{FS="="} {split($0,a,"#");$0=a[1]} /cman_.*=/ {print $1}' $TNS_ADMIN/cman.ora`
+  OLD_HOME=$ORACLE_HOME
+  export ORACLE_HOME=$CMAN_HOME
+  echo "run_cman '$1' (on target $target)"
+  $CMAN_HOME/bin/cmctl <<EOF | oraLoggerWithOutput
+administer $target
+$1
+exit
+EOF
+  export ORACLE_HOME=$OLD_HOME
+}
+
+function local_instances()
+{
+  if [ "$1" = "ASM" ]; then
+    awk 'BEGIN {FS=":"} /^+ASM/ {print $1}' < /etc/oratab | sort -u
+  fi
+}
+
+function run_sql()
+{
+  OLD_SID=$ORACLE_SID
+  OLD_HOME=$ORACLE_HOME
+  SQL_SCRIPT=$(mktemp)
+  echo 'whenever SQLERROR exit 100;
+whenever OSERROR exit 200;
+set pagesize 0
+set linesize 32767' > "$SQL_SCRIPT"
+  if [ $# -lt 2 ]; then
+    while read row
+    do
+      echo "$row" >> "$SQL_SCRIPT"
+    done
+  else
+    echo "$2" >> "$SQL_SCRIPT"
+  fi
+  echo 'exit;' >> "$SQL_SCRIPT"
+  echo "run_sql:" | oraLogger
+  awk '{print "  "$0}' "$SQL_SCRIPT" | oraLogger
+
+  echo "output:" | oraLogger
+  chmod a+r "$SQL_SCRIPT"
+  export ORACLE_SID=`sidFromOratab $1`
+  [ "$ORACLE_SID" ] || return
+  export ORACLE_HOME=`homeFromOratab $ORACLE_SID`
+  if [ "${USER}" = "oracle" ] ; then
+    if [ $3 ]; then
+      TIMEOUT=$3
+      timeout -t $TIMEOUT $ORACLE_HOME/bin/sqlplus -s / as sysdba "@$SQL_SCRIPT" | oraLoggerWithOutput
+    else
+      $ORACLE_HOME/bin/sqlplus -s / as sysdba "@$SQL_SCRIPT" | oraLoggerWithOutput
+    fi
+  else
+    sudo su oracle -c "export ORACLE_SID='$ORACLE_SID';
+      export ORACLE_HOME='$ORACLE_HOME';
+      $ORACLE_HOME/bin/sqlplus -s / as sysdba @$SQL_SCRIPT" | oraLoggerWithOutput
+  fi
+  ret=${PIPESTATUS[0]}
+  rm -f "$SQL_SCRIPT"
+  export ORACLE_SID=$OLD_SID
+  export ORACLE_HOME=$OLD_HOME
+  [ $ret -eq 0 ] && return 0 || return 1
+}
+
+function run_rman()
+{
+  OLD_SID=$ORACLE_SID
+  OLD_HOME=$ORACLE_HOME
+  export ORACLE_SID=`sidFromOratab $1`
+  export ORACLE_HOME=`homeFromOratab $ORACLE_SID`
+  RMAN_PW=$(getpw rman rman_catalog)
+  [ $RMAN_PW ] && CAT="connect catalog rman/$RMAN_PW@rman_cat"
+
+  echo "run_rman:" | oraLogger
+  echo "$2" | oraLogger
+  echo "output:" | oraLogger
+
+  if [ "${USER}" = "oracle" ] ; then
+    Query=$2
+    if [ $3 ]; then
+      TIMEOUT=$3 || TIMEOUT=$((86400))
+      timeout -t $TIMEOUT $ORACLE_HOME/bin/rman target / <<EOF | oraLoggerWithOutput
+$CAT
+$Query
+EOF
+    else
+      $ORACLE_HOME/bin/rman target / <<EOF | oraLoggerWithOutput
+$CAT
+$Query
+EOF
+    fi
+  else
+    Query=$(echo "$2" | sed -e 's|\\|\\\\|g' -e 's|\$|\\\$|g')
+    sudo su oracle -c "export ORACLE_SID='$ORACLE_SID';
+export ORACLE_HOME='$ORACLE_HOME';
+$ORACLE_HOME/bin/rman target / <<EOF
+$CAT
+$Query
+EOF" | oraLoggerWithOutput
+  fi
+  ret=${PIPESTATUS[0]}
+  export ORACLE_SID=$OLD_SID
+  export ORACLE_HOME=$OLD_HOME
+  [ $ret -eq 0 ] && return 0 || return 1
+}
+
+function run_dgmgrl()
+{
+#  [ "$SYS_PW" ] || { echo 'Cannot use run_dgmgrl without setting $SYS_PW' | oraLogger;  return 1; }
+  OLD_SID=$ORACLE_SID
+  OLD_HOME=$ORACLE_HOME
+  export ORACLE_SID=`sidFromOratab $1`
+  export ORACLE_HOME=`homeFromOratab $ORACLE_SID`
+
+  echo "run_dgmgrl:" | oraLogger
+  echo "$2" | oraLogger
+  echo "output:" | oraLogger
+
+  if [ "${USER}" = "oracle" ] ; then
+    $ORACLE_HOME/bin/dgmgrl <<EOF | oraLoggerWithOutput
+    connect sys/$SYS_PW@${ORACLE_SID}_1
+    $2
+EOF
+  else
+    CMD=$(echo "$2" | sed -e 's|\\|\\\\|g' -e 's|\$|\\\$|g')
+    sudo su oracle -c "export ORACLE_SID='$ORACLE_SID';
+      export ORACLE_HOME='$ORACLE_HOME';
+      $ORACLE_HOME/bin/dgmgrl <<EOF
+      connect sys/$SYS_PW@${ORACLE_SID}_1
+      $CMD
+EOF" | oraLoggerWithOutput
+  fi
+  ret=${PIPESTATUS[0]}
+
+  export ORACLE_SID=$OLD_SID
+  export ORACLE_HOME=$OLD_HOME
+  [ $ret -eq 0 ] && return 0 || return 1
+}
+
+
+function oraenv()
+{
+. /usr/local/bin/oraenv
+}
+
+function running_instances()
+{
+  ps -ef | grep pmon | awk '$8~/ora_pmon_D/{split($8,a,"_");print a[3]}'
+}
+
+function setoraenv()
+{
+  export UNAME=`hostname`
+  if [ "$1" ]; then
+    ORAENV_ASK=NO
+    export ORACLE_SID=$1
+    oraenv
+    unset ORAENV_ASK
+  else
+    oraenv
+  fi
+  PS1=$'[\E[1m${TWO_TASK:-${ORACLE_SID:-????}}\E[0m] [$LOGNAME@$UNAME:$PWD]\\n'
+}
+
+function lwr ()
+{
+# return string in lowercase
+ echo $* | tr '[:upper:]' '[:lower:]'
+}
+
+function upr ()
+{
+# return string in UPPERCASE
+ echo $* | tr '[:lower:]' '[:upper:]'
+}
+
+function randpass
+{
+  [ $1 ] && size=$1 || size=8
+  [ $2 ] && char=$2 || char="A-Za-z0-9"
+  PW=1
+  while [ $(echo $PW | grep -E '^[0-9]') ]; do
+    PW=$(</dev/urandom tr -dc A-Za-z0-9 | head -c"$size")
+  done
+  echo "$PW"
+}
+
+# Start of the main part
+[ $logfile ] || logfile=/dev/null
+
+if [ -d /u01/app/oracle -a ! -d /u01/app/oracle/logs ]; then
+  if [ $(whoami) = 'oracle' ]; then
+    bash -c "mkdir -p /u01/app/oracle/logs; chmod 777 /u01/app/oracle/logs"
+  else
+    sudo -u oracle bash -c "mkdir -p /u01/app/oracle/logs; chmod 777 /u01/app/oracle/logs"
+  fi
+fi
+
+set_vars
+unset set_vars
